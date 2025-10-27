@@ -9,6 +9,10 @@ on:
         description: 'Comma-separated list of branches to process'
         required: false
         default: 'main,stable-25-2,stable-25-2-1,stable-25-3,stable-25-3-1,stream-nb-25-1'
+      scripts_branch:
+        description: 'Branch to use for scripts (default: main)'
+        required: false
+        default: 'main'
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -23,22 +27,26 @@ jobs:
     runs-on: [ self-hosted, auto-provisioned, build-preset-analytic-node]
     outputs:
       matrix_branches: ${{ steps.set-matrix.outputs.branches }}
+      scripts_branch: ${{ steps.set-matrix.outputs.scripts_branch }}
     steps:
       - id: set-matrix
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "branches=$(echo '${{ github.event.inputs.branches }}' | jq -R -s -c 'split(",")')" >> $GITHUB_OUTPUT
+            echo "scripts_branch=${{ github.event.inputs.scripts_branch }}" >> $GITHUB_OUTPUT
           else
             echo "branches=$(echo '["main","stable-25-2","stable-25-2-1","stable-25-3","stable-25-3-1","stream-nb-25-1"]' | jq -c .)" >> $GITHUB_OUTPUT
+            echo "scripts_branch=main" >> $GITHUB_OUTPUT
           fi
 
   collect-testowners:
+    needs: [setup]
     runs-on: [ self-hosted, auto-provisioned, build-preset-analytic-node]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.setup.outputs.scripts_branch }}
 
       - name: Install dependencies
         run: |
@@ -67,11 +75,11 @@ jobs:
           PR_BRANCH="${{ env.PR_BRANCH_PREFIX }}_${{ matrix.BASE_BRANCH }}"
           echo "PR_BRANCH=${PR_BRANCH}" >> $GITHUB_ENV
 
-      # Всегда checkout main для получения актуальных скриптов
-      - name: Checkout main branch
+      # Всегда checkout scripts branch для получения актуальных скриптов
+      - name: Checkout scripts branch
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.setup.outputs.scripts_branch }}
           fetch-depth: 0
 
       - name: Install dependencies
@@ -218,8 +226,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.YDBOT_TOKEN }}
         run: |
-          # Возвращаемся на main для доступа к скриптам
-          git checkout main
+          # Возвращаемся на scripts branch для доступа к скриптам
+          git checkout ${{ needs.setup.outputs.scripts_branch }}
           
           python .github/scripts/create_or_update_pr.py create_or_update \
             --base_branch="${{ env.BASE_BRANCH }}" \
