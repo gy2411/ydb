@@ -347,10 +347,30 @@ runs:
           CURRENT_JUNIT_XML_PATH=$CURRENT_PUBLIC_DIR/junit.xml
           CURRENT_REPORT=$CURRENT_PUBLIC_DIR/report.json
           set +e
-          (./ya make $YA_MAKE_TARGET "${params[@]}" \
-            $RERUN_FAILED_OPT --log-file "$PUBLIC_DIR/ya_log.txt"  \
-            --evlog-file "$CURRENT_PUBLIC_DIR/ya_evlog.jsonl" \
-            --junit "$CURRENT_JUNIT_XML_PATH" --build-results-report "$CURRENT_REPORT" --output "$YA_MAKE_OUT_DIR"; echo $? > exit_code) |& cat >> $YA_MAKE_OUTPUT
+
+          systemd-run --wait \
+              --property=OOMScoreAdjust=800 \
+              --property=MemoryMax=4G \
+              --property=MemoryHigh=3.5G \
+              --property=FailureAction=none \
+              --uid=$(id -u) \
+              --gid=$(id -g) \
+              ./ya make $YA_MAKE_TARGET "${params[@]}" \
+                $RERUN_FAILED_OPT --log-file "$PUBLIC_DIR/ya_log.txt"  \
+                --evlog-file "$CURRENT_PUBLIC_DIR/ya_evlog.jsonl" \
+                --junit "$CURRENT_JUNIT_XML_PATH" --build-results-report "$CURRENT_REPORT" --output "$YA_MAKE_OUT_DIR" |& cat >> $YA_MAKE_OUTPUT
+          
+          echo $? > exit_code
+          EXIT_CODE=`cat exit_code`
+          
+          # Проверяем признаки OOM
+          if { [[ $EXIT_CODE -ne 0 ]] && dmesg | grep -i "oom-killer" | grep "$(date +'%b %d %H:%M')"; }; then
+            echo "::warning::⚠️ Процесс был убит OOM Killer! Проверьте потребление памяти."
+            echo "OOM_STATUS=1" >> $GITHUB_ENV
+          else
+            echo "OOM_STATUS=0" >> $GITHUB_ENV
+          fi
+
           set -e
           RC=`cat exit_code`
 
