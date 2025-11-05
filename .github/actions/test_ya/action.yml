@@ -260,6 +260,14 @@ runs:
         # Get current user and group for systemd-run
         CURRENT_UID=$(id -u)
         CURRENT_GID=$(id -g)
+        
+        # Memory limits for systemd-run
+        # MemoryMax: hard limit, process will be killed if exceeded
+        # MemoryHigh: soft limit, process will be throttled if exceeded
+        # MemorySwapMax: limit swap usage to prevent OOM
+        MEMORY_MAX="230G"
+        MEMORY_HIGH="229G"
+        MEMORY_SWAP_MAX="230G"
         if [ "${{ inputs.increment }}" = "true" ]; then
           GRAPH_COMPARE_OUTPUT="$PUBLIC_DIR/graph_compare_log.txt"
           GRAPH_COMPARE_OUTPUT_URL="$PUBLIC_DIR_URL/graph_compare_log.txt"
@@ -311,6 +319,10 @@ runs:
 
         YA_MAKE_OUTPUT="$PUBLIC_DIR/ya_make_output.txt"
         YA_MAKE_OUTPUT_URL="$PUBLIC_DIR_URL/ya_make_output.txt"
+        SYSTEMD_RUN_OUTPUT="$PUBLIC_DIR/systemd_run_output.txt"
+        SYSTEMD_RUN_OUTPUT_URL="$PUBLIC_DIR_URL/systemd_run_output.txt"
+        RAM_USAGE_FILE="$PUBLIC_DIR/ram_usage.txt"
+        RAM_USAGE_FILE_URL="$PUBLIC_DIR_URL/ram_usage.txt"
         echo "20 [Ya make output]($YA_MAKE_OUTPUT_URL)" >> $SUMMARY_LINKS
 
         BUILD_FAILED=0
@@ -368,7 +380,7 @@ runs:
               while true; do
                   used_kb=$(grep -E 'MemTotal|MemAvailable' /proc/meminfo | 
                             awk 'NR==1{t=$2} NR==2{a=$2} END{print t - a}')
-                  echo "$(date +%s) $used_kb" >> ram_usage.txt
+                  echo "$(date +%s) $used_kb" >> "$RAM_USAGE_FILE"
                   sleep 3
               done
           }
@@ -381,14 +393,11 @@ runs:
           SYSTEMD_CMD=""
           if command -v systemd-run >/dev/null 2>&1; then
             # Try systemd-run with --wait (transient service)
-            # MemoryMax=230G: hard limit, process will be killed if exceeded
-            # MemoryHigh=229G: soft limit, process will be throttled if exceeded  
-            # MemorySwapMax=230G: limit swap usage to prevent OOM
             # --uid and --gid: run as current user to avoid permission issues
-            if systemd-run --wait -p MemoryMax=230G -p MemoryHigh=229G -p MemorySwapMax=230G --uid=$CURRENT_UID --gid=$CURRENT_GID true >/dev/null 2>&1; then
-              SYSTEMD_CMD="systemd-run --wait -p MemoryMax=230G -p MemoryHigh=229G -p MemorySwapMax=230G --uid=$CURRENT_UID --gid=$CURRENT_GID --"
-            elif sudo -n systemd-run --wait -p MemoryMax=230G -p MemoryHigh=229G -p MemorySwapMax=230G --uid=$CURRENT_UID --gid=$CURRENT_GID true >/dev/null 2>&1; then
-              SYSTEMD_CMD="sudo systemd-run --wait -p MemoryMax=230G -p MemoryHigh=229G -p MemorySwapMax=230G --uid=$CURRENT_UID --gid=$CURRENT_GID --"
+            if systemd-run --wait -p MemoryMax=$MEMORY_MAX -p MemoryHigh=$MEMORY_HIGH -p MemorySwapMax=$MEMORY_SWAP_MAX --uid=$CURRENT_UID --gid=$CURRENT_GID true >/dev/null 2>&1; then
+              SYSTEMD_CMD="systemd-run --wait -p MemoryMax=$MEMORY_MAX -p MemoryHigh=$MEMORY_HIGH -p MemorySwapMax=$MEMORY_SWAP_MAX --uid=$CURRENT_UID --gid=$CURRENT_GID --"
+            elif sudo -n systemd-run --wait -p MemoryMax=$MEMORY_MAX -p MemoryHigh=$MEMORY_HIGH -p MemorySwapMax=$MEMORY_SWAP_MAX --uid=$CURRENT_UID --gid=$CURRENT_GID true >/dev/null 2>&1; then
+              SYSTEMD_CMD="sudo systemd-run --wait -p MemoryMax=$MEMORY_MAX -p MemoryHigh=$MEMORY_HIGH -p MemorySwapMax=$MEMORY_SWAP_MAX --uid=$CURRENT_UID --gid=$CURRENT_GID --"
             else
               echo "Warning: systemd-run requires authentication, running without memory limits" | tee -a $YA_MAKE_OUTPUT
             fi
@@ -397,18 +406,22 @@ runs:
           fi
 
           if [ -n "$SYSTEMD_CMD" ]; then
-            # Run command with systemd-run and capture all output
+            # Run command with systemd-run
             # PYTHONUNBUFFERED ensures python output is not buffered
             # exec is needed for proper exit code propagation
+            # systemd-run messages go to systemd_run_output.txt, ya make output goes to ya_make_output.txt
+            # The command inside sh -c outputs to ya_make_output.txt, systemd-run metadata goes to systemd_run_output.txt
             $SYSTEMD_CMD \
               sh -c "cd \"$WORK_DIR\" && PYTHONUNBUFFERED=1 exec $YA_MAKE_COMMAND $YA_MAKE_TARGET \
                 $RERUN_FAILED_OPT --log-file \"$PUBLIC_DIR/ya_log.txt\"  \
                 --evlog-file \"$CURRENT_PUBLIC_DIR/ya_evlog.jsonl\" \
-                --junit \"$CURRENT_JUNIT_XML_PATH\" --build-results-report \"$CURRENT_REPORT\" --output \"$YA_MAKE_OUT_DIR\" 2>&1" 2>&1 | tee -a $YA_MAKE_OUTPUT
-            RC=${PIPESTATUS[0]}
+                --junit \"$CURRENT_JUNIT_XML_PATH\" --build-results-report \"$CURRENT_REPORT\" --output \"$YA_MAKE_OUT_DIR\" 2>&1 | tee -a \"$YA_MAKE_OUTPUT\"" > "$SYSTEMD_RUN_OUTPUT" 2>&1
+            RC=$?
             echo $RC > exit_code
             # Force sync to ensure all files are written to disk, especially important after OOM kill
             sync
+            # Add link to systemd_run_output.txt in summary
+            echo "21 [Systemd run output]($SYSTEMD_RUN_OUTPUT_URL)" >> $SUMMARY_LINKS
           else
             ($YA_MAKE_COMMAND $YA_MAKE_TARGET \
               $RERUN_FAILED_OPT --log-file "$PUBLIC_DIR/ya_log.txt"  \
@@ -430,9 +443,12 @@ runs:
             --report-file "$CURRENT_REPORT" \
             --output-file $CURRENT_PUBLIC_DIR/ram_report.html \
             --output-file-url $CURRENT_PUBLIC_DIR_URL/ram_report.html \
-            --ram-usage-file ram_usage.txt \
+            --ram-usage-file "$RAM_USAGE_FILE" \
             --chat-id "$GH_ALERTS_TG_CHAT" \
             --memory-threshold 90 || true
+          
+          # Add link to ram_usage.txt in summary
+          echo "22 [RAM usage]($RAM_USAGE_FILE_URL)" >> $SUMMARY_LINKS
 
           # convert to chromium trace
           # seems analyze-make don't have simple "output" parameter, so change cwd
