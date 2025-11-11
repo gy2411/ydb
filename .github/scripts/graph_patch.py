@@ -10,6 +10,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'tests'))
 import mute_utils
 
 
+# https://nda.ya.ru/t/cj8xxbzf7MnKmJ
+# https://nda.ya.ru/t/s4e2o-GI7MnKnp
+TEST_GOOD_STATUSES = {'OK', 'SKIPPED'}
+
+
 def get_failed_uids(muted_path: str, report_path: str) -> set[str]:
     print('Load failed uids..')
     result = set()
@@ -17,7 +22,7 @@ def get_failed_uids(muted_path: str, report_path: str) -> set[str]:
     with open(report_path) as report_file:
         report = json.load(report_file).get('results', [])
     for record in report:
-        if record.get('status', 'OK') == 'OK' or record.get('suite', False):
+        if record.get('status', 'OK') in TEST_GOOD_STATUSES or record.get('suite', False):
             continue
         if mute_check is not None:
             test_name = f'{record.get("path", "")} {record.get("name", "")}.{record.get("subtest_name", "")}'
