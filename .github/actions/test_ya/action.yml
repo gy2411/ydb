@@ -416,7 +416,7 @@ runs:
 
           set +e
           (./ya make ${params[@]} $YA_MAKE_TARGET $GRAPH_OPTS \
-            ${RERUN_FAILED_OPT[@]} --log-file "$PUBLIC_DIR/ya_log.txt"  \
+            "${RERUN_FAILED_OPT[@]}" --log-file "$PUBLIC_DIR/ya_log.txt"  \
             --evlog-file "$CURRENT_PUBLIC_DIR/ya_evlog.jsonl" \
             --junit "$CURRENT_JUNIT_XML_PATH" --build-results-report "$CURRENT_REPORT" --output "$YA_MAKE_OUT_DIR"; echo $? > exit_code) |& cat >> $YA_MAKE_OUTPUT
           set -e
