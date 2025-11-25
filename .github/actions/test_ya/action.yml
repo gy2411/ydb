@@ -562,7 +562,7 @@ runs:
           CONTEXT_PATH=""
           CURRENT_FAILED_TESTS=$CURRENT_PUBLIC_DIR/failed_tests.txt
           .github/scripts/get_failed_tests.py --report "$CURRENT_REPORT" --out "$CURRENT_FAILED_TESTS"
-          readarray -d ' ' RERUN_FAILED_OPT < $CURRENT_FAILED_TESTS
+          readarray -t RERUN_FAILED_OPT < $CURRENT_FAILED_TESTS
           if [ "${#RERUN_FAILED_OPT[@]}" == "0" ]; then
             break
           fi

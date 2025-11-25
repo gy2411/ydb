@@ -37,4 +37,4 @@ if __name__ == '__main__':
     opts = parser.parse_args()
     failed_tests = get_failed_test_names(muted_path=opts.muted, report_path=opts.report)
     with open(opts.out, 'w') as result_file:
-        result_file.write(' '.join([f"-F '{t}'" for t in failed_tests]))
+        result_file.write('\n'.join([f'-F\n{t}' for t in failed_tests]))
