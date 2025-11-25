@@ -388,11 +388,6 @@ runs:
             RERUN_FAILED_OPT=""
           else
             CURRENT_MESSAGE="$CURRENT_MESSAGE (failed tests rerun, try $RETRY)"
-            if [ -z "$GRAPH_PATH" ]; then
-              RERUN_FAILED_OPT="-X"
-            else
-              RERUN_FAILED_OPT=""
-            fi
           fi
 
           echo $CURRENT_MESSAGE | GITHUB_TOKEN="${{ github.token }}" .github/scripts/tests/comment-pr.py
@@ -562,9 +557,14 @@ runs:
           if [ $IS_LAST_RETRY = 1 ]; then
             break
           fi
-          if [ -n "$GRAPH_PATH" ] && [ -n "$CONTEXT_PATH" ]; then
-              GRAPH_PATH=""
-              CONTEXT_PATH=""
+
+          GRAPH_PATH=""
+          CONTEXT_PATH=""
+          CURRENT_FAILED_TESTS=$CURRENT_PUBLIC_DIR/failed_tests.txt
+          .github/scripts/get_failed_tests.py --report "$CURRENT_REPORT" --out "$CURRENT_FAILED_TESTS"
+          RERUN_FAILED_OPT=$(cat $CURRENT_FAILED_TESTS)
+          if [ -z "$RERUN_FAILED_OPT" ]; then
+            break
           fi
         done;
 
