@@ -84,10 +84,10 @@ def generate_backport_table(pr_number: int, app_domain: str) -> str:
         query_string = "&".join([f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in params.items()])
         url_ui = f"{base_url}?{query_string}&ui=true"
         
-        # Badge with only message (no label) - format: badge/message-color
-        # Encode only spaces, keep emoji as is
-        badge_text = "▶  Backport".replace(" ", "%20")
-        button = f"[![▶  Backport](https://img.shields.io/badge/{badge_text}-4caf50)]({url_ui})"
+        # Use badge with shorter text to avoid truncation in Safari
+        # Shorter text without emoji works better across browsers, especially Safari
+        badge_text = "Backport"
+        button = f"[![Backport](https://img.shields.io/badge/{badge_text}-4caf50)]({url_ui})"
         rows.append(f"| `{branch_display}` | {button} |")
     
     # Generate URL for backporting all unique branches (manual button)
@@ -104,9 +104,9 @@ def generate_backport_table(pr_number: int, app_domain: str) -> str:
     query_string_manual = "&".join([f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in params_manual.items()])
     url_manual_ui = f"{base_url}?{query_string_manual}&ui=true"
     
-    # Badge with only message for manual button
-    # Encode only spaces, keep emoji and parentheses as is (shields.io handles them)
-    badge_text_manual = "▶  Backport manual".replace(" ", "%20")
+    # Use badge with shorter text for manual button to avoid truncation in Safari
+    # Shorter text without emoji works better across browsers, especially Safari
+    badge_text_manual = "Backport%20manual"
     
     table = "<!-- backport-table -->\n"
     table += "<h3>Backport</h3>\n\n"
@@ -115,7 +115,7 @@ def generate_backport_table(pr_number: int, app_domain: str) -> str:
     table += "|--------|-----|\n"
     table += "\n".join(rows)
     table += "\n\n"
-    table += f"[![▶  Backport manual](https://img.shields.io/badge/{badge_text_manual}-2196F3)]({url_manual_ui})"
+    table += f"[![Backport manual](https://img.shields.io/badge/{badge_text_manual}-2196F3)]({url_manual_ui})"
     return table
 
 
