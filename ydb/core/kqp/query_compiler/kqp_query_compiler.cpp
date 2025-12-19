@@ -1264,6 +1264,18 @@ private:
             if (readSettings.VectorTopKColumn) {
                 FillVectorTopKSettings(*readProto.MutableVectorTopK(), readSettings, settings.Columns().Cast());
             }
+
+        } else if (auto settings = source.Settings().Maybe<TKqpReadTableFullTextIndexSourceSettings>()) {
+            NKqpProto::TKqpFullTextSource& fullTextProto = *protoSource->MutableFullTextSource();
+            auto tableMeta = TablesData->ExistingTable(Cluster, settings.Table().Cast().Path()).Metadata;
+            YQL_ENSURE(tableMeta);
+
+            FillTablesMap(settings.Table().Cast(), settings.Columns().Cast(), tablesMap);
+            FillTableId(settings.Table().Cast(), *fullTextProto.MutableTable());
+            fullTextProto.SetIndex(settings.Index().Cast().StringValue());
+            FillColumns(settings.ResultColumns().Cast(), *tableMeta, fullTextProto, false);
+            fullTextProto.MutableQuerySettings()->SetQuery(TString(settings.Query().Cast().Ptr()->Content()));
+            FillColumns(settings.Columns().Cast(), *tableMeta, *fullTextProto.MutableQuerySettings(), false);
         } else {
             YQL_ENSURE(false, "Unsupported source type");
         }
@@ -1273,7 +1285,7 @@ private:
         THashMap<TStringBuf, THashSet<TStringBuf>>& tablesMap, TExprContext& ctx)
     {
         const TStringBuf dataSourceCategory = source.DataSource().Cast<TCoDataSource>().Category();
-        if (dataSourceCategory == NYql::KikimrProviderName || dataSourceCategory == NYql::YdbProviderName || dataSourceCategory == NYql::KqpReadRangesSourceName) {
+        if (IsIn({NYql::KikimrProviderName, NYql::YdbProviderName, NYql::KqpReadRangesSourceName, NYql::KqpFullTextSourceName}, dataSourceCategory)) {
             FillKqpSource(source, protoSource, allowSystemColumns, tablesMap);
         } else {
             FillDqInput(source.Ptr(), protoSource, dataSourceCategory, ctx, true);
@@ -1670,15 +1682,21 @@ private:
         *vectorTopK.MutableSettings() = kmeansDesc.GetSettings().Getsettings();
 
         // Column index
+        THashMap<TStringBuf, ui32> readColumnIndexes;
         ui32 columnIdx = 0;
         for (const auto& column: streamLookupProto.GetColumns()) {
-            if (column == settings.VectorTopColumn) {
-                break;
-            }
-            columnIdx++;
+            readColumnIndexes[column] = columnIdx++;
         }
-        YQL_ENSURE(columnIdx < streamLookup.Columns().Size());
-        vectorTopK.SetColumn(columnIdx);
+        YQL_ENSURE(readColumnIndexes.contains(settings.VectorTopColumn));
+        vectorTopK.SetColumn(readColumnIndexes.at(settings.VectorTopColumn));
+
+        // Unique columns - required when we read from the index posting table and overlap is enabled
+        if (settings.VectorTopDistinct) {
+            for (const auto& keyColumn: mainTable->Metadata->KeyColumnNames) {
+                YQL_ENSURE(readColumnIndexes.contains(keyColumn));
+                vectorTopK.AddDistinctColumns(readColumnIndexes.at(keyColumn));
+            }
+        }
 
         // Limit - may be a parameter which will be linked later
         TExprBase expr(settings.VectorTopLimit);
@@ -1992,6 +2010,8 @@ private:
             // Index settings
             auto& kmeansDesc = std::get<NKikimrKqp::TVectorIndexKmeansTreeDescription>(indexDesc->SpecializedIndexDescription);
             *vectorResolveProto.MutableIndexSettings() = kmeansDesc.GetSettings().Getsettings();
+            vectorResolveProto.SetOverlapClusters(kmeansDesc.GetSettings().overlap_clusters());
+            vectorResolveProto.SetOverlapRatio(kmeansDesc.GetSettings().overlap_ratio());
 
             // Main table
             FillTablesMap(vectorResolve.Table(), tablesMap);

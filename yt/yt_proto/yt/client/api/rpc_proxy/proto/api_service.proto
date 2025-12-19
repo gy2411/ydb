@@ -2161,6 +2161,7 @@ message TReqGetColumnarStatistics
     optional TFetcherConfig fetcher_config = 3;
     optional EColumnarStatisticsFetcherMode fetcher_mode = 4;
     optional bool enable_early_finish = 5 [default = false];
+    optional bool enable_read_size_estimation = 6 [default = false];
 
     optional TTransactionalOptions transactional_options = 100;
 }
@@ -2192,6 +2193,8 @@ message TColumnarStatistics
 
     // Per-column hyperloglog digest to approximate number of unique values
     repeated NYT.NProto.THyperLogLogDigest column_hyperloglog_digests = 14;
+
+    optional int64 read_size_estimation = 15;
 }
 
 message TRspGetColumnarStatistics
@@ -3111,6 +3114,21 @@ message TReqTransferPoolResources
 }
 
 message TRspTransferPoolResources
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+message TReqTransferBundleResources
+{
+    required string src_bundle = 1;
+    required string dst_bundle = 2;
+    required bytes resource_delta = 3; // YSON
+
+    optional TMutatingOptions mutating_options = 103;
+}
+
+message TRspTransferBundleResources
 {
 }
 

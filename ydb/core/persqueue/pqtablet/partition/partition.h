@@ -36,10 +36,6 @@ static const ui32 MAX_USER_ACTS = 1000;
 static const ui32 BATCH_UNPACK_SIZE_BORDER = 500_KB;
 static const ui32 MAX_INLINE_SIZE = 1000;
 
-using TPartitionLabeledCounters =
-    TProtobufTabletLabeledCounters<EPartitionLabeledCounters_descriptor>;
-using TPartitionExtendedLabeledCounters = TProtobufTabletLabeledCounters<EPartitionExtendedLabeledCounters_descriptor>;
-
 ui64 GetOffsetEstimate(const std::deque<TDataKey>& container, TInstant timestamp, ui64 headOffset);
 TMaybe<ui64> GetOffsetEstimate(const std::deque<TDataKey>& container, TInstant timestamp);
 
@@ -630,6 +626,7 @@ private:
             hFuncTraced(TEvPQ::TEvMLPUnlockRequest, Handle);
             hFuncTraced(TEvPQ::TEvMLPChangeMessageDeadlineRequest, Handle);
             hFuncTraced(TEvPQ::TEvGetMLPConsumerStateRequest, Handle);
+            hFuncTraced(TEvPQ::TEvMLPConsumerState, Handle);
         default:
             if (!Initializer.Handle(ev)) {
                 ALOG_ERROR(NKikimrServices::PERSQUEUE, "Unexpected " << EventStr("StateInit", ev));
@@ -704,6 +701,7 @@ private:
             hFuncTraced(TEvPQ::TEvMLPUnlockRequest, Handle);
             hFuncTraced(TEvPQ::TEvMLPChangeMessageDeadlineRequest, Handle);
             hFuncTraced(TEvPQ::TEvGetMLPConsumerStateRequest, Handle);
+            hFuncTraced(TEvPQ::TEvMLPConsumerState, Handle);
         default:
             ALOG_ERROR(NKikimrServices::PERSQUEUE, "Unexpected " << EventStr("StateIdle", ev));
             break;
@@ -963,10 +961,9 @@ private:
     std::deque<THolder<TEvPQ::TEvChangeOwner>> WaitToChangeOwner;
 
     TTabletCountersBase TabletCounters;
-    THolder<TPartitionLabeledCounters> PartitionCountersLabeled;
-    THolder<TPartitionExtendedLabeledCounters> PartitionCountersExtended;
-
-    THolder<TPartitionKeyCompactionCounters> PartitionCompactionCounters;
+    std::optional<TTabletLabeledCountersBase> PartitionCountersLabeled;
+    std::optional<TTabletLabeledCountersBase> PartitionCountersExtended;
+    std::optional<TTabletLabeledCountersBase> PartitionKeyCompactionCounters;
 
     // Per partition counters
     NMonitoring::TDynamicCounters::TCounterPtr WriteTimeLagMsByLastWritePerPartition;
@@ -1235,16 +1232,19 @@ private:
     void Handle(TEvPQ::TEvMLPUnlockRequest::TPtr&);
     void Handle(TEvPQ::TEvMLPChangeMessageDeadlineRequest::TPtr&);
     void Handle(TEvPQ::TEvGetMLPConsumerStateRequest::TPtr&);
+    void Handle(TEvPQ::TEvMLPConsumerState::TPtr&);
 
     void ProcessMLPPendingEvents();
     template<typename TEventHandle>
     void ForwardToMLPConsumer(const TString& consumer, TAutoPtr<TEventHandle>& ev);
 
     void InitializeMLPConsumers();
+    void DropDataOfMLPConsumer(NKikimrClient::TKeyValueRequest& request, const TString& consumer);
     void NotifyEndOffsetChanged();
 
     struct TMLPConsumerInfo {
         TActorId ActorId;
+        NKikimrPQ::TAggregatedCounters::TMLPConsumerCounters Metrics;
     };
     std::unordered_map<TString, TMLPConsumerInfo> MLPConsumers;
 

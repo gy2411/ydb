@@ -55,6 +55,16 @@ class TPushMapRule : public ISimplifiedRule {
 };
 
 /**
+ * Push limit into sort operator
+ */
+class TPushLimitIntoSortRule : public ISimplifiedRule {
+  public:
+    TPushLimitIntoSortRule() : ISimplifiedRule("Push limit into sort operator", ERuleProperties::RequireParents) {}
+
+    virtual std::shared_ptr<IOperator> SimpleTestAndApply(const std::shared_ptr<IOperator> &input, TRBOContext &ctx, TPlanProps &props) override;
+};
+
+/**
  * Push down filter through joins, adding join conditions to the join operator and potentially
  * converting left join into inner join
  */
@@ -63,6 +73,16 @@ class TPushFilterRule : public ISimplifiedRule {
     TPushFilterRule() : ISimplifiedRule("Push filter", ERuleProperties::RequireParents) {}
 
     virtual std::shared_ptr<IOperator> SimpleTestAndApply(const std::shared_ptr<IOperator> &input, TRBOContext &ctx, TPlanProps &props) override;
+};
+
+/**
+ * Push down filter to olap read.
+ */
+class TPushOlapFilterRule : public ISimplifiedRule {
+  public:
+      TPushOlapFilterRule() : ISimplifiedRule("Push olap filter", ERuleProperties::RequireParents | ERuleProperties::RequireTypes) {}
+
+      virtual std::shared_ptr<IOperator> SimpleTestAndApply(const std::shared_ptr<IOperator>& input, TRBOContext& ctx, TPlanProps& props) override;
 };
 
 /**
@@ -121,6 +141,7 @@ extern TRuleBasedStage RuleStage3;
 extern TRuleBasedStage RuleStage4;
 extern TRuleBasedStage RuleStage5;
 extern TRuleBasedStage RuleStage6;
+extern TRuleBasedStage RuleStage7;
 
 /**
  * Separate global stage to remove extra renames and project out unneeded columns
@@ -137,6 +158,15 @@ class TRenameStage : public IRBOStage {
 class TConstantFoldingStage : public IRBOStage {
   public:
     TConstantFoldingStage();
+    virtual void RunStage(TOpRoot &root, TRBOContext &ctx) override;
+};
+
+/**
+ * Prune unnecessary columns stage
+ */
+class TPruneColumnsStage : public IRBOStage {
+  public:
+    TPruneColumnsStage();
     virtual void RunStage(TOpRoot &root, TRBOContext &ctx) override;
 };
 

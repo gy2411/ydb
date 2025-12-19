@@ -758,18 +758,19 @@ message TEvKqpScanCursor {
     message TColumnShardScanPlain {
     }
     message TColumnShardScanSimple {
-        optional uint64 SourceId = 1;
+        optional uint64 SourceIdx = 1;
         optional uint32 StartRecordIndex = 2;
     }
     message TColumnShardScanNotSortedSimple {
-        optional uint64 SourceId = 1;
+        optional uint64 SourceIdx = 1;
         optional uint32 StartRecordIndex = 2;
     }
     oneof Implementation {
         TColumnShardScanPlain ColumnShardPlain = 10;
-        TColumnShardScanSimple ColumnShardSimple = 11;
-        TColumnShardScanNotSortedSimple ColumnShardNotSortedSimple = 12;
+        TColumnShardScanSimple ColumnShardSimple = 13;
+        TColumnShardScanNotSortedSimple ColumnShardNotSortedSimple = 14;
     }
+    reserved 11, 12; // deprecated
 }
 
 message TEvRemoteScanData {
@@ -901,6 +902,24 @@ message TKqpStreamLookupSettings {
     optional string Database = 18;
     optional TReadVectorTopK VectorTopK = 19;
 }
+
+message TKqpFullTextSourceSettings {
+    message TKqpQuerySettings {
+        repeated TKqpColumnMetadataProto Columns = 4;
+        optional string Query = 1;
+    }
+
+    optional NKqpProto.TKqpPhyTableId Table = 1;
+    optional string Index = 2;
+
+    repeated TKqpColumnMetadataProto Columns = 3;
+
+    optional TKqpQuerySettings QuerySettings = 4;
+
+    optional TKqpSnapshot Snapshot = 5;
+
+    optional string Database = 6;
+};
 
 message TKqpSequencerSettings {
     optional NKqpProto.TKqpPhyTableId Table = 1;

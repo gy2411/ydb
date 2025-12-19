@@ -310,6 +310,7 @@ message TKqpPhyVectorTopK {
     Ydb.Table.VectorIndexSettings Settings = 2;
     TKqpPhyValue TargetVector = 3;
     TKqpPhyValue Limit = 4;
+    repeated uint32 DistinctColumns = 5;
 }
 
 message TKqpPhyCnStreamLookup {
@@ -337,6 +338,8 @@ message TKqpPhyCnVectorResolve {
     bytes OutputType = 8;
     uint32 ClusterColumnOutPos = 9;
     optional uint32 RootClusterColumnIndex = 10;
+    optional uint32 OverlapClusters = 11;
+    optional double OverlapRatio = 12;
 }
 
 message TKqpPhyCnSequencer {
@@ -398,6 +401,20 @@ message TKqpPhyConnection {
     };
 }
 
+message TKqpFullTextSource {
+    message TKqpQuerySettings {
+        repeated TKqpPhyColumnId Columns = 4;
+        optional string Query = 1;
+    }
+
+    optional TKqpPhyTableId Table = 1;
+    optional string Index = 2;
+
+    repeated TKqpPhyColumnId Columns = 3;
+
+    optional TKqpQuerySettings QuerySettings = 4;
+}
+
 message TKqpReadRangesSource {
     TKqpPhyTableId Table = 1;
     repeated TKqpPhyColumnId Columns = 2;
@@ -436,6 +453,7 @@ message TKqpSource {
     oneof Type {
         TKqpReadRangesSource ReadRangesSource = 3;
         TKqpExternalSource ExternalSource = 4;
+        TKqpFullTextSource FullTextSource = 5;
     }
 }
 

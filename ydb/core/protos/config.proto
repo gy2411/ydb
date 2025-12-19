@@ -1904,6 +1904,12 @@ message TImmediateControlsConfig {
             DefaultValue: 2 }];
 
         optional TRequestReportingSettings RequestReportingSettings = 12;
+
+        optional uint64 MaxPutTimeoutSeconds = 13 [(ControlOptions) = {
+            Description: "Maximum amount of time TEvPut request can work until it is terminated with DEADLINE status by DSProxy",
+            MinValue: 1,
+            MaxValue: 1000000,
+            DefaultValue: 60 }]; // 1 minute
     }
 
     message TPDiskControls {
@@ -2404,7 +2410,7 @@ message TColumnShardConfig {
     }
 
     optional uint32 MaxInFlightIntervalsOnRequest = 16;
-    optional uint32 MaxReadStaleness_ms = 18 [default = 1800000];
+    optional uint32 MaxReadStaleness_ms = 18 [default = 300000];
     optional uint32 GCIntervalMs = 19 [default = 30000];
     optional uint32 CompactionActualizationLagMs = 20 [default = 1000];
     optional uint32 ActualizationTasksLagMs = 21 [default = 1000];
@@ -2451,6 +2457,13 @@ message TColumnShardConfig {
 
     optional TStatistics Statistics = 57;
     optional NKikimrSchemeOp.TS3Settings S3Client = 58;
+    optional uint32 ProxyOverloadedDelayMs = 59 [default = 5000];
+    optional uint32 ProxyMaxRetriesPerShard = 60 [default = 10];
+    
+    oneof DefaultCompaction {
+        string DefaultCompactionPreset = 61 [default = "tiling"];
+        NKikimrSchemeOp.TCompactionPlannerConstructorContainer DefaultCompactionConstructor = 62;
+    }
 }
 
 message TSchemeShardConfig {
@@ -2856,6 +2869,7 @@ message TSystemTabletBackupConfig {
         TFilesystemBackend Filesystem = 1;
     }
     repeated fixed64 ExcludeTabletIds = 2;
+    optional uint64 NewBackupChangelogMinBytes = 3 [default = 524288000]; // 500 MB
 }
 
 message TAppConfig {
